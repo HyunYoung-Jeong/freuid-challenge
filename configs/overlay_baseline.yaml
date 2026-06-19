@@ -18,7 +18,7 @@ model:
   type: overlay
   noise_frontend: bayar
   noise_feat_dim: 128
-  use_rgb_stream: false
+  use_rgb_stream: true
   rgb_backbone: resnet34
   rgb_pretrained: true
   fusion_dim: 128
