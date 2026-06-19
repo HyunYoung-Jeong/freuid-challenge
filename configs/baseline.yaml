@@ -1,0 +1,30 @@
+seed: 42
+
+debug:
+  enabled: true
+  max_samples: 200
+
+data:
+  train_csv: data/raw/train_labels.csv
+  train_img_dir: data/raw/train/train
+  test_img_dir: data/raw/public_test/public_test
+  val_doc_type: MAURITIUS/ID
+  img_size: 224
+  num_workers: 0
+
+model:
+  name: resnet18
+  pretrained: true
+
+train:
+  epochs: 3
+  batch_size: 16
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  scheduler: cosine
+
+output:
+  model_dir: outputs/models
+  pred_dir: outputs/predictions
+  sub_dir: outputs/submissions
+  experiment_name: baseline
