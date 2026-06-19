@@ -5,9 +5,9 @@ import pandas as pd
 import torch
 from tqdm import tqdm
 
-from src.data import build_test_dataloader
+from src.data import build_test_dataloader, build_overlay_test_dataloader
 from src.model import build_model
-from src.transforms import get_val_transforms
+from src.transforms import get_val_transforms, get_overlay_val_transforms
 from src.utils import load_config, parse_args, set_seed
 
 
@@ -41,7 +41,12 @@ def main():
     print(f"loaded checkpoint: {ckpt_path}")
 
     img_size = cfg["data"]["img_size"]
-    test_loader = build_test_dataloader(cfg, get_val_transforms(img_size))
+    if cfg["model"].get("type") == "overlay":
+        test_loader = build_overlay_test_dataloader(
+            cfg, get_overlay_val_transforms(img_size)
+        )
+    else:
+        test_loader = build_test_dataloader(cfg, get_val_transforms(img_size))
 
     ids, scores = predict(model, test_loader, device)
 

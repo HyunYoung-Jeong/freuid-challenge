@@ -8,3 +8,5 @@ scikit-learn
 pyyaml
 tqdm
 pillow
+facenet-pytorch>=2.5.3  # install with --no-deps if numpy>=2.0
+opencv-python

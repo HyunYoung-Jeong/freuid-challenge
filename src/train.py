@@ -6,10 +6,13 @@ import torch.nn as nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm import tqdm
 
-from src.data import build_dataloaders
+from src.data import build_dataloaders, build_overlay_dataloaders
 from src.metrics import compute_apcer_at_bpcer, compute_audet
 from src.model import build_model
-from src.transforms import get_train_transforms, get_val_transforms
+from src.transforms import (
+    get_train_transforms, get_val_transforms,
+    get_overlay_train_transforms, get_overlay_val_transforms,
+)
 from src.utils import load_config, parse_args, set_seed
 
 
@@ -73,7 +76,7 @@ def sanity_check_init_loss(model, loader, criterion, device):
     expected = -np.log(0.5)
     print(f"[sanity] init loss: {loss:.4f} (expected ~{expected:.4f})")
     if abs(loss - expected) > 0.3:
-        print("[sanity] WARNING: init loss is far from expected — check data/model")
+        print("[sanity] WARNING: init loss is far from expected -- check data/model")
 
 
 def sanity_check_overfit_batch(model, loader, criterion, optimizer, device):
@@ -91,7 +94,7 @@ def sanity_check_overfit_batch(model, loader, criterion, optimizer, device):
         if (i + 1) % 10 == 0:
             print(f"  step {i+1}: loss={loss.item():.4f}")
     if loss.item() > 0.1:
-        print("[sanity] WARNING: could not overfit batch — check model/data path")
+        print("[sanity] WARNING: could not overfit batch -- check model/data path")
     else:
         print("[sanity] batch overfit OK")
 
@@ -105,9 +108,15 @@ def main():
     print(f"device: {device}")
 
     img_size = cfg["data"]["img_size"]
-    train_tf = get_train_transforms(img_size)
-    val_tf = get_val_transforms(img_size)
-    train_loader, val_loader = build_dataloaders(cfg, train_tf, val_tf)
+    is_overlay = cfg["model"].get("type") == "overlay"
+    if is_overlay:
+        train_tf = get_overlay_train_transforms(img_size)
+        val_tf = get_overlay_val_transforms(img_size)
+        train_loader, val_loader = build_overlay_dataloaders(cfg, train_tf, val_tf)
+    else:
+        train_tf = get_train_transforms(img_size)
+        val_tf = get_val_transforms(img_size)
+        train_loader, val_loader = build_dataloaders(cfg, train_tf, val_tf)
     print(f"train: {len(train_loader.dataset)}, val: {len(val_loader.dataset)}")
 
     model = build_model(cfg).to(device)
