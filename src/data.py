@@ -45,12 +45,73 @@ class FREUIDDataset(Dataset):
 _mtcnn_instance = None
 
 
-def _get_mtcnn():
+def _get_mtcnn(device="cpu"):
     global _mtcnn_instance
     if _mtcnn_instance is None:
         from facenet_pytorch import MTCNN
-        _mtcnn_instance = MTCNN(keep_all=False, device="cpu", post_process=False)
+        _mtcnn_instance = MTCNN(keep_all=False, device=device, post_process=False)
     return _mtcnn_instance
+
+
+def _crop_face(image: np.ndarray, mtcnn, crop_margin: float) -> np.ndarray:
+    h, w = image.shape[:2]
+    pil_img = Image.fromarray(image)
+    boxes, _ = mtcnn.detect(pil_img)
+
+    if boxes is not None and len(boxes) > 0:
+        x1, y1, x2, y2 = boxes[0]
+        bw, bh = x2 - x1, y2 - y1
+        mx = bw * crop_margin
+        my = bh * crop_margin
+        x1 = max(0, int(x1 - mx))
+        y1 = max(0, int(y1 - my))
+        x2 = min(w, int(x2 + mx))
+        y2 = min(h, int(y2 + my))
+        return image[y1:y2, x1:x2]
+
+    side = int(min(h, w) * 0.6)
+    cy, cx = h // 2, w // 2
+    y1 = cy - side // 2
+    x1 = cx - side // 2
+    return image[y1:y1 + side, x1:x1 + side]
+
+
+def precache_crops(cfg: dict):
+    """Pre-cache face crops for all train + test images. Run once before training."""
+    from tqdm import tqdm
+
+    cache_dir = cfg["data"].get("crop_cache_dir", "data/processed/overlay_crops")
+    os.makedirs(cache_dir, exist_ok=True)
+    crop_margin = cfg["data"].get("crop_margin", 0.75)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    mtcnn = _get_mtcnn(device)
+
+    img_dirs = [cfg["data"]["train_img_dir"]]
+    if os.path.isdir(cfg["data"].get("test_img_dir", "")):
+        img_dirs.append(cfg["data"]["test_img_dir"])
+
+    all_paths = []
+    for img_dir in img_dirs:
+        for f in os.listdir(img_dir):
+            if f.endswith(".jpeg"):
+                image_id = f.replace(".jpeg", "")
+                cache_path = os.path.join(cache_dir, f"{image_id}.png")
+                if not os.path.exists(cache_path):
+                    all_paths.append((os.path.join(img_dir, f), image_id, cache_path))
+
+    if not all_paths:
+        print(f"all crops already cached in {cache_dir}/")
+        return
+
+    print(f"caching {len(all_paths)} face crops (device={device})...")
+    for img_path, image_id, cache_path in tqdm(all_paths, desc="crop"):
+        image = cv2.imread(img_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        crop = _crop_face(image, mtcnn, crop_margin)
+        cv2.imwrite(cache_path, cv2.cvtColor(crop, cv2.COLOR_RGB2BGR))
+
+    print(f"done. {len(all_paths)} crops saved to {cache_dir}/")
 
 
 class OverlayDataset(Dataset):
